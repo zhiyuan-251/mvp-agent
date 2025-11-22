@@ -46,33 +46,68 @@ def build_dfs(records):
     for rec in records:
         rid = rec.get('id')
         question = rec.get('question')
-        partial = rec.get('partial', {})
-        debate = rec.get('debate', {})
-
-        # summary row
-        rows.append({
-            'id': rid,
-            'question': question,
-            'partial_winner': partial.get('winner'),
-            'partial_time_s': partial.get('time_s'),
-            'partial_f1': partial.get('f1'),
-            'partial_dominance': partial.get('dominance'),
-            'debate_winner': debate.get('winner'),
-            'debate_time_s': debate.get('time_s'),
-            'debate_f1': debate.get('f1'),
-            'debate_dominance': debate.get('dominance'),
-        })
-
-        # top_scores long form
-        for stage_name, stage in [('partial', partial), ('debate', debate)]:
-            top_scores = stage.get('top_scores') or {}
-            for agent_name, score in (top_scores.items() if isinstance(top_scores, dict) else []):
+        
+        # Check if this is the new format with all_agent_scores
+        if 'all_agent_scores' in rec:
+            # New format - determine winner from highest score
+            all_scores = rec.get('all_agent_scores', {})
+            if all_scores:
+                winner = max(all_scores, key=all_scores.get)
+                max_score = all_scores[winner]
+            else:
+                winner = None
+                max_score = None
+            
+            rows.append({
+                'id': rid,
+                'question': question,
+                'partial_winner': winner,
+                'partial_time_s': None,
+                'partial_f1': max_score,
+                'partial_dominance': None,
+                'debate_winner': None,
+                'debate_time_s': None,
+                'debate_f1': None,
+                'debate_dominance': None,
+            })
+            
+            # Add scores in long form (treat as 'single' stage)
+            for agent_name, score in all_scores.items():
                 scores_rows.append({
                     'id': rid,
-                    'stage': stage_name,
+                    'stage': 'single',
                     'agent': agent_name,
                     'score': score,
                 })
+        else:
+            # Original format with partial/debate
+            partial = rec.get('partial', {})
+            debate = rec.get('debate', {})
+
+            # summary row
+            rows.append({
+                'id': rid,
+                'question': question,
+                'partial_winner': partial.get('winner'),
+                'partial_time_s': partial.get('time_s'),
+                'partial_f1': partial.get('f1'),
+                'partial_dominance': partial.get('dominance'),
+                'debate_winner': debate.get('winner'),
+                'debate_time_s': debate.get('time_s'),
+                'debate_f1': debate.get('f1'),
+                'debate_dominance': debate.get('dominance'),
+            })
+
+            # top_scores long form
+            for stage_name, stage in [('partial', partial), ('debate', debate)]:
+                top_scores = stage.get('top_scores') or {}
+                for agent_name, score in (top_scores.items() if isinstance(top_scores, dict) else []):
+                    scores_rows.append({
+                        'id': rid,
+                        'stage': stage_name,
+                        'agent': agent_name,
+                        'score': score,
+                    })
 
     df_entries = pd.DataFrame(rows)
     df_scores = pd.DataFrame(scores_rows)
@@ -85,13 +120,23 @@ def plot_winner_counts(df_entries, outdir):
     debate_counts = df_entries['debate_winner'].value_counts(dropna=True)
 
     winners = sorted(set(partial_counts.index).union(debate_counts.index))
+    
+    if not winners:
+        print('No winner data available for plotting winner counts.')
+        return
+    
     df = pd.DataFrame({
         'partial': [partial_counts.get(w, 0) for w in winners],
         'debate': [debate_counts.get(w, 0) for w in winners],
     }, index=winners)
 
+    # Check if dataframe is empty or has no non-zero values
+    if df.empty or df.sum().sum() == 0:
+        print('No winner data available for plotting winner counts.')
+        return
+
     plt.figure(figsize=(10, max(4, len(winners) * 0.4)))
-    df.plot(kind='bar', rot=45)
+    ax = df.plot(kind='bar', rot=45)
     plt.title('Winner counts by agent (partial vs debate)')
     plt.tight_layout()
     out = os.path.join(outdir, 'winners_counts.png')

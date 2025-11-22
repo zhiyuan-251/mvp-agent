@@ -1,7 +1,7 @@
 """Small-scale evaluator to compare Partial Decentralization vs Multi-Round Debate.
 
 Usage:
-    python scripts/compare_partial_vs_debate.py --input data/hotpot_test_fullwiki_v1.json --sample 20 --out logs/eval_compare.jsonl
+    python scripts/compare_partial_vs_debate.py --input data/hotpot_dev_fullwiki_v1.json --sample 20 --out logs/eval_compare.jsonl
 
 What it measures (per question):
 - question id/text
@@ -79,7 +79,7 @@ def simple_answer_match(pred: str, golds: List[str]) -> bool:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', '-i', default='data/hotpot_test_fullwiki_v1.json')
+    parser.add_argument('--input', '-i', default='data/hotpot_dev_fullwiki_v1.json')
     parser.add_argument('--sample', '-s', type=int, default=100, help='Number of questions to sample')
     parser.add_argument('--out', '-o', default=None)
     parser.add_argument('--seed', type=int, default=42)
@@ -181,6 +181,21 @@ def main():
                 debate_llm_calls = get_and_reset_call_count()
                 debate_scores = score_answers(debate_ans)
                 debate_winner = debate_scores[0].agent_id if debate_scores else None
+                
+                # 可视化debate结果
+                print(f"\n=== DEBATE RESULTS for Q{qid} ===")
+                print(f"Question: {qtext[:100]}{'...' if len(qtext) > 100 else ''}")
+                print(f"Execution time: {debate_time:.2f}s")
+                print(f"LLM calls: {debate_llm_calls}")
+                print(f"Shared docs: {len(debate_ev.top_docs) if debate_ev else 0}")
+                print(f"Winner: {debate_winner}")
+                if debate_scores:
+                    print("Agent scores:")
+                    for score in sorted(debate_scores, key=lambda x: x.score, reverse=True):
+                        print(f"  {score.agent_id}: {score.score:.4f}")
+                if debate_ans:
+                    print(f"Winner's answer: {debate_ans[0].answer[:200]}{'...' if len(debate_ans[0].answer) > 200 else ''}")
+                print("=" * 50)
 
             # Enhanced gold answer extraction for HotpotQA
             def extract_gold_answers(entry: Dict[str, Any]) -> List[str]:
