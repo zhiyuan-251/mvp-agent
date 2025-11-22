@@ -35,12 +35,24 @@ def load_dataset(path: str) -> List[Dict[str, Any]]:
         raise FileNotFoundError(path)
     with open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)
+    
+    # HotpotQA格式：直接是包含问题字典的列表
+    if isinstance(data, list):
+        print(f"Loaded {len(data)} entries from {path}")
+        return data
+    
+    # 其他可能的格式
     if isinstance(data, dict):
         if 'data' in data and isinstance(data['data'], list):
+            print(f"Loaded {len(data['data'])} entries from {path} (nested in 'data')")
             return data['data']
         if 'questions' in data and isinstance(data['questions'], list):
+            print(f"Loaded {len(data['questions'])} entries from {path} (nested in 'questions')")
             return data['questions']
+        print(f"Converting dict to list: {len(data)} entries")
         return list(data.values())
+    
+    print(f"Loaded data of type {type(data)}")
     return data
 
 
@@ -170,20 +182,48 @@ def main():
                 debate_scores = score_answers(debate_ans)
                 debate_winner = debate_scores[0].agent_id if debate_scores else None
 
-            # simple gold matching
-            golds = []
-            for k in ('answer', 'answer_text', 'final_answer'):
-                v = entry.get(k)
-                if isinstance(v, str) and v:
-                    golds.append(v)
-            # some Hotpot formats use 'answer' under other keys
-            if not golds and isinstance(entry, dict):
-                # try to locate nested answer
-                for val in entry.values():
-                    if isinstance(val, dict) and 'answer' in val:
-                        a = val.get('answer')
-                        if isinstance(a, str):
-                            golds.append(a)
+            # Enhanced gold answer extraction for HotpotQA
+            def extract_gold_answers(entry: Dict[str, Any]) -> List[str]:
+                golds = []
+                
+                # 1. 直接检查常见答案字段
+                for k in ('answer', 'answer_text', 'final_answer', 'gold_answer'):
+                    v = entry.get(k)
+                    if isinstance(v, str) and v.strip():
+                        golds.append(v.strip())
+                
+                # 2. 检查嵌套答案（某些格式可能将答案放在子字典中）
+                if not golds and isinstance(entry, dict):
+                    for key, val in entry.items():
+                        if isinstance(val, dict) and 'answer' in val:
+                            a = val.get('answer')
+                            if isinstance(a, str) and a.strip():
+                                golds.append(a.strip())
+                
+                # 3. 检查是否有答案列表（多个可能的正确答案）
+                for k in ('answers', 'gold_answers', 'possible_answers'):
+                    v = entry.get(k)
+                    if isinstance(v, list):
+                        for ans in v:
+                            if isinstance(ans, str) and ans.strip():
+                                golds.append(ans.strip())
+                            elif isinstance(ans, dict) and 'text' in ans:
+                                text = ans.get('text')
+                                if isinstance(text, str) and text.strip():
+                                    golds.append(text.strip())
+                
+                return list(set(golds))  # 去重
+            
+            golds = extract_gold_answers(entry)
+            
+            # 调试信息：如果没有找到答案，打印条目结构
+            if not golds:
+                print(f"Warning: No gold answer found for question {qid}")
+                print(f"Entry keys: {list(entry.keys()) if isinstance(entry, dict) else 'Not a dict'}")
+                if isinstance(entry, dict):
+                    for k in ['answer', '_id', 'question']:
+                        if k in entry:
+                            print(f"  {k}: {entry[k]}")
 
             partial_pred = partial_ans[0].answer if partial_ans else ''
             debate_pred = debate_ans[0].answer if debate_ans else ''
