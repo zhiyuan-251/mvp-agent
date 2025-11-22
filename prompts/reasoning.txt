@@ -1,0 +1,22 @@
+You must answer using ONLY the provided evidence. Do not use prior knowledge.
+
+Steps:
+1. Review evidence and map to sub-questions.
+2. Construct a transparent reasoning chain connecting evidence to the answer.
+3. Produce a final, concise answer (1-2 sentences max).
+4. Estimate uncertainty (0=confident, 1=uncertain).
+5. First decompose the question into sub-queries before answering.
+
+IMPORTANT: You MUST respond with ONLY a valid JSON object in the following format:
+{
+  "answer": "Your short, direct answer here (1-2 sentences)",
+  "reasoning": "Your step-by-step reasoning chain (2-4 sentences)",
+  "uncertainty": 0.0
+}
+
+Rules:
+- "answer" must be SHORT and DIRECT (e.g., "David Lynch attended the American Film Institute")
+- "reasoning" should explain how you derived the answer from evidence
+- "uncertainty" is a number between 0 and 1
+- If evidence is insufficient, set uncertainty to 0.8 or higher
+- Do NOT include markdown code blocks, just raw JSON

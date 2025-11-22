@@ -1,0 +1,33 @@
+MODELS:
+  agent_A: deepseek-ai/DeepSeek-V2.5
+  agent_B: Qwen/Qwen2.5-7B-Instruct
+  agent_C: THUDM/glm-4-9b-chat
+  agent_D: gpt-4o-mini
+
+SEARCH_BACKEND:
+  type: BM25
+  index_path: ./data/hotpotqa_corpus.json
+  max_docs: 50000
+
+PARALLELISM:
+  agent_workers: 4
+
+OUTPUT:
+  save_traces: true
+  save_agent_reasoning: true
+  save_evidence: true
+
+API:
+  base_url: https://api.siliconflow.cn/v1/chat/completions
+  api_key_env: DEEPSEEK_API_KEY
+  timeout: 60
+  # OpenAI反代配置（针对gpt-4o-mini模型）
+  openai_base_url: https://openkey.cloud/v1/chat/completions
+  openai_api_key: sk-uMdtcPwsTVT1LxZ0Bc9aDc2871F9434b9e707fA6C1F97098
+
+RETRIEVAL:
+  k: 8
+
+PARTIAL_DECENTRALIZATION:
+  enabled: true
+  cluster_k: 3
